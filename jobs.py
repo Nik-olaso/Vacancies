@@ -73,7 +73,7 @@ def get_vacancies_superjob(superjob_secret_key, language):
             else:
                 raise ex
         response = response.json()
-        vacancies_sj.extend(item for item in response.get('objects'))
+        vacancies_sj.extend(response.get('objects'))
         if not response.get('more'):
             break
     return vacancies_sj
@@ -89,7 +89,6 @@ def get_vacancies_headhunter(language):
     }
     for page in count(0):
         try:
-            print(language, page)
             response = requests.get(hh_url, params=params)
             params["page"] = page
             response.raise_for_status()
@@ -113,10 +112,9 @@ def make_table(languages, languages_rate, table_name):
     return table
 
 
-def make_superjob_vacancies_table(superjob_secret_key, languages):
+def make_superjob_languages_rate(superjob_secret_key, languages):
     languages_rate_sj = {}
     for language in languages:   
-        print(language)
         vacancies_sj = get_vacancies_superjob(superjob_secret_key, language)
         try:
             vacancies_count, average_salary = get_superjob_payment(vacancies_sj)
@@ -128,11 +126,10 @@ def make_superjob_vacancies_table(superjob_secret_key, languages):
         except TimeoutError:
             ("Прошло слишком много времени на обработку информации, переходим к следующей вакансии")
             continue
-    table_sj = make_table(languages, languages_rate_sj, "SuperJob Moscow")
-    return table_sj
+    return languages_rate_sj
 
 
-def make_headhunter_vacancies_table(languages):
+def make_headhunter_languages_rate(languages):
     languages_rate_hh = {}   
     for language in languages:
         vacancies_hh = get_vacancies_headhunter(language)
@@ -146,16 +143,17 @@ def make_headhunter_vacancies_table(languages):
         except TimeoutError:
             ("Прошло слишком много времени на обработку информации, переходим к следующей вакансии")
             continue
-    table_hh = make_table(languages, languages_rate_hh, "HeadHunter Moscow")
-    return table_hh
+    return languages_rate_hh
 
 
 def main():
     load_dotenv()
     superjob_secret_key = os.environ["SUPERJOB_SECRET_KEY"]    
     languages = ["JavaScript", "Java", "Python", "PHP", "C++", "C#", "C", "Go"]
-    table_sj = make_superjob_vacancies_table(superjob_secret_key, languages)
-    table_hh = make_headhunter_vacancies_table(languages)
+    languages_rate_sj = make_superjob_languages_rate(superjob_secret_key, languages)
+    languages_rate_hh = make_headhunter_languages_rate(languages)
+    table_sj = make_table(languages, languages_rate_sj, "SuperJob Moscow")
+    table_hh = make_table(languages, languages_rate_hh, "HeadHunter Moscow")
     print(table_sj.table, table_hh.table)
 
 
