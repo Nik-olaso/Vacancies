@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from terminaltables import AsciiTable
 from itertools import count
+from contextlib import suppress
 
 
 def get_headhunter_salary(vacancies):
@@ -88,7 +89,7 @@ def get_vacancies_headhunter(language):
         "cuurency" : "RUR"
     }
     for page in count(0):
-        try:
+        with suppress(requests.exceptions.HTTPError):
             response = requests.get(hh_url, params=params)
             params["page"] = page
             response.raise_for_status()
@@ -96,16 +97,14 @@ def get_vacancies_headhunter(language):
             vacancies_hh.extend(response.get("items", []))
             if page >= response['pages']:
                 break
-        except requests.exceptions.HTTPError:
-            continue
     return vacancies_hh
         
 
 def make_table(languages, languages_rate, table_name):
     full_table = [["Язык программирования", "Вакансий найдено", "Вакансий обработано", "Средняя зарплата"]]
-    for language in languages:
+    for language, content in languages_rate.items():
         table_params = [
-            language, languages_rate[language]["vacancies_found"], languages_rate[language]["vacancies_processed"], languages_rate[language]["average_salary"]
+            language, content["vacancies_found"], content["vacancies_processed"], content["average_salary"]
         ]
         full_table.append(table_params)
     table = AsciiTable(full_table, table_name)
@@ -116,16 +115,12 @@ def make_superjob_languages_rate(superjob_secret_key, languages):
     languages_rate_sj = {}
     for language in languages:   
         vacancies_sj = get_vacancies_superjob(superjob_secret_key, language)
-        try:
-            vacancies_count, average_salary = get_superjob_payment(vacancies_sj)
-            languages_rate_sj[language] = {
-                "vacancies_found" : len(vacancies_sj),
-                "vacancies_processed" : vacancies_count,
-                "average_salary" : int(average_salary)
-            }       
-        except TimeoutError:
-            ("Прошло слишком много времени на обработку информации, переходим к следующей вакансии")
-            continue
+        vacancies_count, average_salary = get_superjob_payment(vacancies_sj)
+        languages_rate_sj[language] = {
+            "vacancies_found" : len(vacancies_sj),
+            "vacancies_processed" : vacancies_count,
+            "average_salary" : int(average_salary)
+        }       
     return languages_rate_sj
 
 
@@ -133,16 +128,12 @@ def make_headhunter_languages_rate(languages):
     languages_rate_hh = {}   
     for language in languages:
         vacancies_hh = get_vacancies_headhunter(language)
-        try:
-            vacancies_count, average_salary = get_headhunter_salary(vacancies_hh)
-            languages_rate_hh[language] = {
-                "vacancies_found" : len(vacancies_hh),
-                "vacancies_processed" : vacancies_count,
-                "average_salary" : int(average_salary)
-            }
-        except TimeoutError:
-            ("Прошло слишком много времени на обработку информации, переходим к следующей вакансии")
-            continue
+        vacancies_count, average_salary = get_headhunter_salary(vacancies_hh)
+        languages_rate_hh[language] = {
+            "vacancies_found" : len(vacancies_hh),
+            "vacancies_processed" : vacancies_count,
+            "average_salary" : int(average_salary)
+        }
     return languages_rate_hh
 
 
@@ -154,7 +145,7 @@ def main():
     languages_rate_hh = make_headhunter_languages_rate(languages)
     table_sj = make_table(languages, languages_rate_sj, "SuperJob Moscow")
     table_hh = make_table(languages, languages_rate_hh, "HeadHunter Moscow")
-    print(table_sj.table, table_hh.table)
+    print(f"{table_sj.table}\n\n{table_hh.table}")
 
 
 if __name__ == "__main__":
